@@ -14,7 +14,10 @@ class LockService:
         current_time = time.time()
         
         # Очищаем устаревшие блокировки
-        expired_keys = [k for k, v in LOCK_TIMEOUT if current_time - v > LOCK_TIMEOUT]
+        expired_keys = [
+            k for k, v in cls._locks.items() 
+            if current_time - v > LOCK_TIMEOUT
+        ]
         
         for key_to_remove in expired_keys:
             cls._locks.pop(key_to_remove, None)
