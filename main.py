@@ -9,16 +9,6 @@ from bot.dispatcher import dp
 
 # Хэндлеры
 from handlers import routers
-# from handlers.new_start import router as start_router
-# from handlers.simple_router import router as start_router
-# from handlers.simple_router import cleanup_user_cache
-# from handlers.start import router as start_router
-# from handlers.help import router as help_router
-# from handlers.errors import router as errors_router
-# from handlers.sheets.read_data import router as read_data_router
-# from handlers.sheets.write_data import router as write_data_router
-# from handlers.sheets.clear_data import router as clear_data_router
-# from handlers.sheets.info import router as info_router
 
 from services.storage import user_storage
 

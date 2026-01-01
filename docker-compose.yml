@@ -1,0 +1,22 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: washing-machine-bot
+    restart: unless-stopped
+    volumes:
+      # Монтируем директорию с конфигами и сертификатами
+      - ./config:/app/config:ro
+      - ./data:/app/data  # Для хранения данных (если понадобится)
+    environment:
+      # Можно передавать переменные окружения
+      - TZ=Europe/Moscow
+    # Для продакшена можно добавить healthcheck
+    # healthcheck:
+    #   test: ["CMD", "python", "-c", "import requests; requests.get('https://api.telegram.org')"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
