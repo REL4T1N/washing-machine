@@ -1,5 +1,7 @@
 from typing import List
+from datetime import datetime
 from config.constants import DAYS_OF_WEEK
+from utils.date_helpers import is_cell_available_for_date, parse_cell_content  # ДОБАВИМ
 
 def split_message(text: str, max_length: int = 4000) -> List[str]:
     """Разбивает длинное сообщение на части"""
@@ -18,12 +20,23 @@ def split_message(text: str, max_length: int = 4000) -> List[str]:
     return messages
 
 def format_washing_schedule_simple(data: List[List[str]]) -> str:
-    """Упрощенное форматирование расписания"""
+    """Упрощенное форматирование расписания с учетом дат"""
     if len(data) < 2:
         return "📭 Таблица пуста"
     
     lines = ["📅 <b>РАСПИСАНИЕ СТИРАЛЬНЫХ МАШИН</b>\n"]
-        
+    
+    # Получаем даты для текущей недели
+    current_week_dates = {}
+    for day_idx, day_name in enumerate(DAYS_OF_WEEK):
+        try:
+            # Используем нашу функцию из date_helpers
+            from utils.date_helpers import get_date_for_day
+            date_str = get_date_for_day(day_name)
+            current_week_dates[day_name] = date_str
+        except:
+            current_week_dates[day_name] = None
+    
     for day_idx, day_name in enumerate(DAYS_OF_WEEK):
         name_col_idx = day_idx * 2 + 1
         
@@ -32,6 +45,9 @@ def format_washing_schedule_simple(data: List[List[str]]) -> str:
         
         day_lines = [f"\n<b>{day_name}</b>", "─" * 20]
         
+        # Дата текущего дня недели в этой неделе
+        current_date = current_week_dates.get(day_name)
+        
         for time_row_idx in range(1, min(9, len(data))):
             time_slot = data[time_row_idx][0] if data[time_row_idx] else ""
             
@@ -39,12 +55,33 @@ def format_washing_schedule_simple(data: List[List[str]]) -> str:
             if (len(data[time_row_idx]) > name_col_idx and 
                 data[time_row_idx][name_col_idx] and 
                 data[time_row_idx][name_col_idx].strip()):
-                booking = data[time_row_idx][name_col_idx].strip()
+                
+                cell_value = data[time_row_idx][name_col_idx].strip()
+                
+                # Парсим запись
+                parsed = parse_cell_content(cell_value)
+                
+                if parsed and parsed.get('date'):
+                    # Проверяем, актуальна ли запись для этой недели
+                    if current_date and parsed['date'] == current_date:
+                        # Запись на эту неделю - показываем
+                        booking = cell_value
+                    else:
+                        # Запись на другую неделю - показываем как свободно
+                        booking = "свободно"
+                else:
+                    # Не удалось распарсить или нет даты
+                    booking = cell_value
+            else:
+                booking = "свободно"
             
             if time_slot:
                 status = "🔴" if booking != "свободно" else "🟢"
                 day_lines.append(f"{status} <b>{time_slot}</b>: {booking}")
         
         lines.extend(day_lines)
+    
+    # Добавляем информацию о неделе
+    lines.append("\n📆 <i>Актуально на текущую неделю</i>")
     
     return "\n".join(lines)

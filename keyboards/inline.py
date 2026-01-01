@@ -3,6 +3,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config.constants import DAYS_OF_WEEK, TIME_SLOTS
 
+from utils.date_helpers import get_formatted_date_for_day
+
 def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура главного меню"""
     builder = InlineKeyboardBuilder()
@@ -29,23 +31,41 @@ def get_days_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     
     for day in DAYS_OF_WEEK:
-        builder.row(InlineKeyboardButton(text=day, callback_data=f"day_{day}"))
+        date_str = get_formatted_date_for_day(day)
+        button_text = f"{day} ({date_str})"
+        builder.row(InlineKeyboardButton(text=button_text, callback_data=f"day_{day}"))
     
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"))
     
     return builder.as_markup()
 
-def get_times_keyboard(day: str, occupied_times: list[str] = None) -> InlineKeyboardMarkup:
-    """Клавиатура для выбора времени с проверкой занятости"""
+def get_times_keyboard(day: str, target_date: str, free_times: list[str]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура для выбора времени
+    Показываем ТОЛЬКО свободные слоты на указанную дату
+    
+    Аргументы:
+    - day: день недели ('Пн', 'Вт'...)
+    - target_date: дата в формате 'дд.мм'
+    - free_times: список времен, которые СВОБОДНЫ на эту дату
+    """
+
     builder = InlineKeyboardBuilder()
     
-    occupied_times = occupied_times or []
-    
-    for time_text, time_code in TIME_SLOTS:
-        if time_text in occupied_times:
-            builder.row(InlineKeyboardButton(text=f"❌ {time_text} (занято)", callback_data="time_occupied"))
-        else:
-            builder.row(InlineKeyboardButton(text=f"✅ {time_text}", callback_data=f"time_{time_code}_{day}"))
+    if not free_times:
+        # Если нет свободных слотов
+        builder.row(InlineKeyboardButton(
+            text="❌ Нет свободных слотов", 
+            callback_data="no_slots"
+        ))
+    else:
+        for time_text, time_code in TIME_SLOTS:
+            if time_text in free_times:
+                # Только свободные слоты
+                builder.row(InlineKeyboardButton(
+                    text=f"✅ {time_text}", 
+                    callback_data=f"time_{time_code}_{day}"
+                ))
     
     builder.row(InlineKeyboardButton(text="◀️ Назад к выбору дня", callback_data="back_to_days"))
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"))

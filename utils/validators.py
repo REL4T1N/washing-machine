@@ -1,50 +1,51 @@
 import re
 from typing import Tuple
 
-def validate_name_date_input(text: str) -> Tuple[bool, str, str, str]:
+def validate_name_only(text: str) -> Tuple[bool, str, str]:
     """
-    Проверяет ввод имени и даты
-    Возвращает (корректно ли, имя, дата, сообщение об ошибке)
+    Валидирует имя
+    Возвращает: (успех, имя, сообщение_об_ошибке)
+    
+    Правила:
+    1. Имя должно быть от 2 до 50 символов
+    2. Разрешены: буквы (рус/англ), цифры, скобки (), пробелы, дефисы, точки
+    3. Должно содержать хотя бы одну букву
     """
     text = text.strip()
     
-    if len(text) < 3:
-        return False, "", "", "Слишком короткий ввод. Нужно: Имя дд.мм"
+    # 1. Проверка на пустоту
+    if not text:
+        return False, "", "Имя не может быть пустым"
     
-    parts = text.split()
+    # 2. Проверка длины
+    if len(text) < 2:
+        return False, "", "Имя должно быть минимум 2 символа"
     
-    if len(parts) < 2:
-        return False, "", "", "Нужно ввести имя и дату через пробел"
+    if len(text) > 50:
+        return False, "", "Имя слишком длинное (максимум 50 символов)"
     
-    name = " ".join(parts[:-1])
-    date_str = parts[-1]
+    # 3. Проверка допустимых символов (опционально, но рекомендую)
+    # Разрешаем: буквы (рус/англ), цифры, пробелы, дефисы, точки
+    name_pattern = r'^[A-Za-zА-Яа-яЁё0-9\s\-\.\(\)]+$'
+    if not re.match(name_pattern, text):
+        return False, "", "Имя содержит недопустимые символы. Используйте только буквы, цифры, скобки (), пробелы, дефисы"
     
-    if len(name) < 2:
-        return False, "", "", "Имя должно быть минимум 2 символа"
+    # 4. Проверка что имя содержит хотя бы одну букву
+    if not re.search(r'[A-Za-zА-Яа-яЁё]', text):
+        return False, "", "Имя должно содержать хотя бы одну букву"
     
-    # Проверяем дату
-    date_pattern = r'^\d{1,2}\.\d{1,2}$'
-    if not re.match(date_pattern, date_str):
-        return False, "", "", "Неверный формат даты. Используйте: дд.мм (например: 25.12)"
+    # 5. Проверка что имя не состоит только из пробелов/спецсимволов
+    cleaned = re.sub(r'[\s\-\.\(\)]', '', text)
+    if len(cleaned) == 0:
+        return False, "", "Имя не может состоять только из специальных символов"
     
-    try:
-        day, month = map(int, date_str.split('.'))
-        
-        if month < 1 or month > 12:
-            return False, "", "", "Месяц должен быть от 1 до 12"
-        
-        if day < 1 or day > 31:
-            return False, "", "", "День должен быть от 1 до 31"
-        
-        if month == 2 and day > 29:
-            return False, "", "", "В феврале максимум 29 дней"
-        
-        if month in [4, 6, 9, 11] and day > 30:
-            return False, "", "", f"В {month} месяце максимум 30 дней"
-            
-    except ValueError:
-        return False, "", "", "Ошибка в формате даты"
+    # 6. Очистка лишних пробелов
+    cleaned_name = ' '.join(text.split())
     
-    formatted_date = f"{day:02d}.{month:02d}"
-    
-    return True, name, formatted_date, ""
+    return True, cleaned_name, ""
+
+# Функция для быстрой проверки
+def is_valid_name(name: str) -> bool:
+    """Быстрая проверка валидности имени"""
+    is_valid, _, _ = validate_name_only(name)
+    return is_valid
