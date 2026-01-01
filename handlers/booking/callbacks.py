@@ -1,10 +1,8 @@
-from datetime import datetime
-
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery
 
-from handlers.booking.commands import show_table, get_occupied_times_for_day
+from handlers.booking.commands import show_table
 from states.booking_states import BookingState
 from keyboards.inline import (
     get_days_keyboard, 
@@ -12,6 +10,9 @@ from keyboards.inline import (
     get_cancel_keyboard,
     get_main_menu_keyboard
 )
+from utils.date_helpers import get_date_for_day
+from services.booking_service import get_free_times_for_day 
+
 
 router = Router()
 
@@ -43,24 +44,22 @@ async def choose_day_handler(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Ошибка выбора дня")
         return
     
-    await state.update_data(selected_day=selected_day)
+    target_date = get_date_for_day(selected_day)
+
+    await state.update_data(selected_day=selected_day, target_date=target_date)
     await state.set_state(BookingState.choosing_time)
     
-    occupied_times = await get_occupied_times_for_day(selected_day)
+    free_times = await get_free_times_for_day(selected_day, target_date)
     
     await callback.message.edit_text(
-        text=f"📅 Выбран день: <b>{selected_day}</b>\n\n"
-             f"Выберите свободное время (❌ - занято, ✅ - свободно):",
+        text=f"📅 Выбран день: <b>{selected_day}</b>\n"
+             f"📆 Дата: <b>{target_date}</b>\n\n"
+             f"Выберите свободное время:",
         parse_mode="HTML",
-        reply_markup=get_times_keyboard(selected_day, occupied_times)
+        reply_markup=get_times_keyboard(selected_day, target_date, free_times)
     )
     
     await callback.answer()
-
-@router.callback_query(F.data == "time_occupied")
-async def time_occupied_handler(callback: CallbackQuery):
-    """Обработчик нажатия на занятое время"""
-    await callback.answer("❌ Это время уже занято! Выберите другое время.", show_alert=True)
 
 @router.callback_query(F.data.startswith("time_"))
 async def choose_time_handler(callback: CallbackQuery, state: FSMContext):
@@ -77,26 +76,27 @@ async def choose_time_handler(callback: CallbackQuery, state: FSMContext):
         end_hour = parts[2]    # "9"
         selected_day = parts[3]  # "Пн"
         
+        # Получаем данные из состояния
+        data = await state.get_data()
+        target_date = data.get('target_date', "")
+
         # Форматируем время в читаемый вид
         time_str = f"{start_hour}:00-{end_hour}:00"
         
         await state.update_data(
             selected_time=time_str,
-            selected_day=selected_day
+            selected_day=selected_day,
+            target_date=target_date
         )
         await state.set_state(BookingState.entering_name)
-        
-        today = datetime.now()
-        date_suggestion = today.strftime("%d.%m")
         
         await callback.message.edit_text(
             text=f"📝 <b>Запись на:</b>\n"
                  f"📅 День: <b>{selected_day}</b>\n"
+                 f"📆 Дата: <b>{target_date}</b>\n"
                  f"⏰ Время: <b>{time_str}</b>\n\n"
-                 f"Введите ваше имя и дату в формате:\n"
-                 f"<code>Имя дд.мм</code>\n\n"
-                 f"<i>Например: Иван {date_suggestion}</i>\n"
-                 f"<i>или: Мария 25.12</i>",
+                 f"Введите ваше имя в формате:\n"
+                 f"<i>Например: Иван</i>",
             parse_mode="HTML",
             reply_markup=get_cancel_keyboard()
         )
