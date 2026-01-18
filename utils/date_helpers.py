@@ -68,19 +68,6 @@ def parse_cell_content(cell_text: str) -> Optional[dict]:
             'full_text': text
         }
     
-    # Если нет даты в формате дд.мм, проверяем другие форматы
-    pattern2 = r'^(.+?)\s+(\d{1,2}[.,]\d{1,2})$'
-    match2 = re.match(pattern2, text)
-    if match2:
-        # Пытаемся нормализовать дату (заменяем запятые на точки)
-        name = match2.group(1).strip()
-        date_str = match2.group(2).strip().replace(',', '.')
-        return {
-            'name': name,
-            'date': date_str,
-            'full_text': text
-        }
-    
     return None
 
 def is_cell_available_for_date(cell_text: str, target_date_str: str) -> Tuple[bool, Optional[str]]:
@@ -102,7 +89,7 @@ def is_cell_available_for_date(cell_text: str, target_date_str: str) -> Tuple[bo
         return False, f"Невозможно прочитать запись: {cell_text}"
     
     if not parsed.get('date'):
-        # Есть имя, но нет даты (старый формат?) 
+        # Есть имя, но нет даты (старый формат) 
         # Можно перезаписать
         return True, None
     
@@ -120,14 +107,36 @@ def get_date_for_day(selected_day: str) -> str:
     try:
         target_date = get_date_for_weekday(selected_day)
         return target_date.strftime("%d.%m")
-    except Exception as e:
-        # В случае ошибки возвращаем сегодняшнюю дату
+    except Exception:
         return datetime.now().strftime("%d.%m")
-    
+
 def get_formatted_date_for_day(day_name: str) -> str:
+    return get_date_for_day(day_name)
+
+def is_date_expired(date_str: str) -> bool:
     """
-    Удобная обертка: получает дату для дня недели в формате 'дд.мм'
-    Используется в интерфейсе для показа пользователю
+    Проверяет, прошла ли дата (формат дд.мм).
+    Считаем, что если дата "вчера" или раньше в этом году - она прошла.
+    Для простоты: сравниваем month и day.
     """
-    date_obj = get_date_for_weekday(day_name)
-    return date_obj.strftime("%d.%m")
+    try:
+        now = datetime.now()
+        day, month = map(int, date_str.split('.'))
+        
+        # Создаем объект даты текущего года
+        # (нюанс: если сейчас декабрь, а дата январь - это может быть след. год, 
+        # но в рамках недельного расписания это обычно обрабатывается корректно 
+        # при создании записи. Здесь мы чистим совсем старые).
+        
+        booking_date = datetime(now.year, month, day, 23, 59)
+        
+        # Если сейчас январь, а запись за декабрь — вероятно, это прошлый год
+        if now.month == 1 and month == 12:
+            booking_date = booking_date.replace(year=now.year - 1)
+        # Если сейчас декабрь, а запись за январь — это будущий год (не удаляем)
+        elif now.month == 12 and month == 1:
+            booking_date = booking_date.replace(year=now.year + 1)
+            
+        return booking_date < now
+    except ValueError:
+        return True # Если дата кривая, считаем протухшей

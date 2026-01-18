@@ -8,6 +8,8 @@ from services.lock_service import LockService
 
 from services.google_sheets import google_sheets_service
 
+from services.storage import user_storage
+
 from utils.helpers import get_cell_address
 from utils.date_helpers import is_cell_available_for_date, create_booking_record
 
@@ -96,12 +98,11 @@ async def write_to_sheet_with_lock(
     time_slot: str, 
     name: str,  # Добавляем параметр name
     target_date: str,  # Делаем обязательным
-    booking_record: str = None  # Опционально: готовая запись
+    booking_record: str = None,  # Опционально: готовая запись
+    tg_id: int = None
 ) -> tuple[bool, str]:
     """
-    Записывает значение в таблицу с блокировкой и проверкой
-    
-    booking_record: если не указано, будет создано автоматически
+    Записывает значение в таблицу с блокировкой и обновляет storage.
     """
     try:
         # Определяем адрес ячейки
@@ -128,6 +129,7 @@ async def write_to_sheet_with_lock(
                     return False, error_msg
                 else:
                     return False, f"❌ Ячейка уже занята: <b>{current_value}</b>"
+                
             
             # Записываем значение
             success = await google_sheets_service.write_value(
@@ -135,9 +137,17 @@ async def write_to_sheet_with_lock(
                 cell=cell_address,
                 value=booking_record
             )
-            
-            if not success:
-                return False, "Ошибка записи в таблицу"
+
+            if success:
+                if tg_id:
+                    user_storage.add_booking(
+                        user_id=tg_id,
+                        cell_address=cell_address,
+                        date=target_date
+                    )
+                
+            elif not success:
+                return False, "Ошибка записи в таблицу (Google API)"
             
             return True, ""
             
@@ -147,16 +157,12 @@ async def write_to_sheet_with_lock(
 
             # ВСЕГДА очищаем кэш после записи!
             invalidate_table_cache()
-            print("✅ Запись завершена, кэш очищен")
             
     except Exception as e:
         # При ошибке тоже очищаем кэш
         invalidate_table_cache()
-        print(f"❌ Ошибка записи, кэш очищен: {e}")
         return False, f"Ошибка записи: {str(e)}"
     
-
-
 async def is_cell_free(cell_address: str, target_date: str) -> tuple[bool, str, str]:
     """
     Проверяет, свободна ли ячейка для указанной даты
@@ -271,3 +277,43 @@ async def get_free_times_for_day(day: str, target_date: str = None) -> list[str]
     except Exception as e:
         print(f"Ошибка при получении свободных времен: {e}")
         return [] # При общей ошибке - пустой список
+    
+
+async def delete_booking(cell_address: str, user_id: int) -> tuple[bool, str]:
+    """
+    Удаляет бронь:
+    1. Блокирует ячейку
+    2. Очищает в Google Sheets (ставит пустую строку)
+    3. Удаляет из user_storage
+    """
+    try:
+        # Проверяем владельца (на всякий случай)
+        owner_id = user_storage.get_owner_by_cell(cell_address)
+        if owner_id and str(owner_id) != str(user_id):
+             return False, "❌ Это не ваша запись!"
+
+        lock_acquired = LockService.acquire_lock(cell_address)
+        if not lock_acquired:
+            return False, "⏳ Система занята, попробуйте через пару секунд"
+
+        try:
+            # Пишем пустую строку в Google Sheets
+            success = await google_sheets_service.write_value(
+                sheet_name=SHEET_NAME,
+                cell=cell_address,
+                value="" 
+            )
+
+            if success:
+                user_storage.remove_booking(cell_address)
+                invalidate_table_cache() # Сбрасываем кэш
+                return True, ""
+            else:
+                return False, "Ошибка связи с Google Sheets"
+
+        finally:
+            LockService.release_lock(cell_address)
+
+    except Exception as e:
+        invalidate_table_cache()
+        return False, f"Ошибка удаления: {e}"
