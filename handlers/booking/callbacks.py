@@ -7,11 +7,11 @@ from states.booking_states import BookingState
 from keyboards.inline import (
     get_days_keyboard, 
     get_times_keyboard, 
-    get_cancel_keyboard,
     get_main_menu_keyboard
 )
-from utils.date_helpers import get_date_for_day
-from services.booking_service import get_free_times_for_day 
+from utils.date_helpers import get_date_for_day, create_booking_record
+from services.booking_service import write_to_sheet_with_lock, get_free_times_for_day
+from services.storage import user_storage
 
 
 router = Router()
@@ -76,35 +76,67 @@ async def choose_time_handler(callback: CallbackQuery, state: FSMContext):
         end_hour = parts[2]    # "9"
         selected_day = parts[3]  # "Пн"
         
-        # Получаем данные из состояния
+        time_slot = f"{start_hour}:00-{end_hour}:00"
+        
         data = await state.get_data()
-        target_date = data.get('target_date', "")
+        target_date = data.get('target_date')
+        
+        # 1. Получаем имя пользователя
+        user_id = callback.from_user.id
+        user_data = user_storage.get_user(user_id)
+        
+        # Теоретически такого быть не должно из-за фильтров, но проверим
+        if not user_data or not user_data.get("name"):
+            await callback.answer("❌ Ошибка: У вас не установлено имя. Используйте /name", show_alert=True)
+            await state.clear()
+            return
 
-        # Форматируем время в читаемый вид
-        time_str = f"{start_hour}:00-{end_hour}:00"
-        
-        await state.update_data(
-            selected_time=time_str,
-            selected_day=selected_day,
-            target_date=target_date
-        )
-        await state.set_state(BookingState.entering_name)
-        
+        name = user_data.get("name")
+
+        # 2. Визуальное подтверждение
         await callback.message.edit_text(
-            text=f"📝 <b>Запись на:</b>\n"
-                 f"📅 День: <b>{selected_day}</b>\n"
-                 f"📆 Дата: <b>{target_date}</b>\n"
-                 f"⏰ Время: <b>{time_str}</b>\n\n"
-                 f"Введите ваше имя в формате:\n"
-                 f"<i>Например: Иван</i>",
-            parse_mode="HTML",
-            reply_markup=get_cancel_keyboard()
+            text=f"⏳ Записываю...\n"
+                 f"👤 <b>{name}</b>\n"
+                 f"📅 {selected_day} {target_date}\n"
+                 f"⏰ {time_slot}",
+            parse_mode="HTML"
         )
+
+        # 3. Попытка записи
+        booking_record = create_booking_record(name, target_date)
         
-        await callback.answer()
+        success, error_msg = await write_to_sheet_with_lock(
+            day=selected_day,
+            time_slot=time_slot,
+            name=name,
+            target_date=target_date,
+            booking_record=booking_record,
+            tg_id=user_id  # Передаем ID для сохранения в базу
+        )
+
+        if success:
+            await callback.message.edit_text(
+                text=f"✅ <b>Успешная запись!</b>\n\n"
+                     f"👤 <b>{name}</b>\n"
+                     f"📅 {selected_day} ({target_date})\n"
+                     f"⏰ {time_slot}\n\n"
+                     f"<i>Нажмите 'Обновить', чтобы увидеть себя в таблице.</i>",
+                parse_mode="HTML",
+                reply_markup=get_main_menu_keyboard()
+            )
+        else:
+            await callback.message.edit_text(
+                text=f"❌ <b>Не удалось записаться:</b>\n{error_msg}\n\n"
+                     f"Попробуйте выбрать другое время.",
+                parse_mode="HTML",
+                reply_markup=get_main_menu_keyboard()
+            )
         
+        await state.clear()
+
     except Exception as e:
         await callback.answer(f"❌ Ошибка: {str(e)[:50]}", show_alert=True)
+        await state.clear()
 
 @router.callback_query(F.data == "back_to_days")
 async def back_to_days_handler(callback: CallbackQuery, state: FSMContext):
@@ -126,3 +158,15 @@ async def cancel_handler(callback: CallbackQuery, state: FSMContext):
         reply_markup=get_main_menu_keyboard()
     )
     await callback.answer("Отменено")
+
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
+    """Возвращает пользователя в главное меню с таблицей"""
+    # Сбрасываем возможные состояния
+    await state.clear()
+    
+    await callback.answer("🏠 Главное меню")
+    
+    # Используем уже готовую функцию отображения таблицы
+    # is_update=True позволяет отредактировать текущее сообщение, а не слать новое
+    await show_table(callback.message, state, is_update=True, callback=callback)

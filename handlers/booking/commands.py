@@ -6,15 +6,10 @@ from aiogram.types import Message
 from keyboards.inline import get_main_menu_keyboard
 
 from utils.formatters import format_washing_schedule_simple, split_message
-from utils.validators import validate_name_only
-from utils.date_helpers import create_booking_record
 
-from states.booking_states import BookingState
-
-from services.booking_service import get_cached_table, write_to_sheet_with_lock
+from services.booking_service import get_cached_table
 
 router = Router()
-
 
 @router.message(Command("table"))
 async def get_table(message: Message, state: FSMContext):
@@ -24,7 +19,6 @@ async def get_table(message: Message, state: FSMContext):
 async def show_table(message: Message, state: FSMContext, is_update: bool = False, callback=None):
     """Показывает таблицу (используется и для команды, и для обновления)"""
     try:
-        # range_input = "A1:N9"
         result = await get_cached_table(force_refresh=is_update)
         
         if not result or not result[0]:
@@ -32,24 +26,18 @@ async def show_table(message: Message, state: FSMContext, is_update: bool = Fals
         else:
             text = format_washing_schedule_simple(result)
         
-        # Разбиваем длинное сообщение если нужно
+        markup = get_main_menu_keyboard()
+
+        # Разбиваем длинное сообщение
         if len(text) > 4000:
             messages = split_message(text, 4000)
             for i, msg in enumerate(messages):
                 if i == len(messages) - 1:
                     if is_update and callback:
-                        await callback.message.edit_text(
-                            text=msg, 
-                            parse_mode="HTML", 
-                            reply_markup=get_main_menu_keyboard()
-                        )
+                        await callback.message.edit_text(text=msg, parse_mode="HTML", reply_markup=markup)
                         await callback.answer("✅ Данные обновлены", show_alert=False)
                     else:
-                        await message.answer(
-                            text=msg, 
-                            parse_mode="HTML", 
-                            reply_markup=get_main_menu_keyboard()
-                        )
+                        await message.answer(text=msg, parse_mode="HTML", reply_markup=markup)
                 else:
                     await message.answer(text=msg, parse_mode="HTML")
             await state.clear()
@@ -57,119 +45,24 @@ async def show_table(message: Message, state: FSMContext, is_update: bool = Fals
 
         if is_update and callback:
             try:
-                await callback.message.edit_text(
-                    text=text,
-                    parse_mode="HTML",
-                    reply_markup=get_main_menu_keyboard()
-                )
+                await callback.message.edit_text(text=text, parse_mode="HTML", reply_markup=markup)
                 await callback.answer("✅ Данные обновлены", show_alert=False)
             except Exception as e:
                 if "message is not modified" in str(e):
                     await callback.answer("✅ Данные уже актуальны", show_alert=False)
                 else:
-                    await callback.message.answer(
-                        text=text,
-                        parse_mode="HTML",
-                        reply_markup=get_main_menu_keyboard()
-                    )
-                    await callback.answer("✅ Данные обновлены (отправлено новое сообщение)", show_alert=False)
+                    # Если нельзя отредактировать (старое сообщение), шлем новое
+                    await callback.message.answer(text=text, parse_mode="HTML", reply_markup=markup)
+                    await callback.answer()
         else:
-            await message.answer(
-                text=text,
-                parse_mode="HTML",
-                reply_markup=get_main_menu_keyboard()
-            )
+            await message.answer(text=text, parse_mode="HTML", reply_markup=markup)
         
         await state.clear()
     
     except Exception as e:
         error_text = f"❌ Ошибка при чтении: {str(e)[:100]}"
         if is_update and callback:
-            await callback.message.edit_text(
-                text=error_text,
-                reply_markup=get_main_menu_keyboard()
-            )
-            await callback.answer("❌ Ошибка при обновлении", show_alert=True)
+            await callback.message.edit_text(text=error_text, reply_markup=get_main_menu_keyboard())
         else:
-            await message.answer(
-                text=error_text,
-                reply_markup=get_main_menu_keyboard()
-            )
+            await message.answer(text=error_text, reply_markup=get_main_menu_keyboard())
         await state.clear()
-
-@router.message(BookingState.entering_name)
-async def enter_name_handler(message: Message, state: FSMContext):
-    """Обработчик ввода имени и даты"""
-    user_input = message.text.strip()
-    
-    is_valid, name, error_msg = validate_name_only(user_input)
-    
-    if not is_valid:
-        await message.answer(
-            text=f"❌ {error_msg}\n\n"
-                 f"Попробуйте еще раз в формате: <code>Имя</code>\n"
-                 f"<i>Например: Иван</i>",
-            parse_mode="HTML"
-        )
-        return
-    
-    data = await state.get_data()
-    day = data.get('selected_day')
-    time_slot = data.get('selected_time')
-    target_date = data.get('target_date')
-    
-    if not all([day, time_slot, target_date]):
-        await message.answer(
-            text="❌ Ошибка: данные о времени утеряны. Начните заново.",
-            reply_markup=get_main_menu_keyboard()
-        )
-        await state.clear()
-        return
-    
-    processing_msg = await message.answer("⏳ Проверяю доступность времени...")
-    
-    try:
-        # Формируем запись: Имя + дата
-        booking_record = create_booking_record(name, target_date)
-        
-        # Записываем с проверкой
-        success, error_msg = await write_to_sheet_with_lock(
-            day=day,
-            time_slot=time_slot,
-            name=name,  # Передаем имя отдельно
-            target_date=target_date,  # И дату отдельно
-            booking_record=booking_record  # И готовую запись
-        )
-        
-        if success:
-            await processing_msg.delete()
-            
-            await message.answer(
-                text=f"✅ <b>Запись успешно добавлена!</b>\n\n"
-                     f"📅 День: <b>{day}</b>\n"
-                     f"📆 Дата: <b>{target_date}</b>\n"
-                     f"⏰ Время: <b>{time_slot}</b>\n"
-                     f"👤 Запись: <b>{booking_record}</b>\n\n"
-                     f"Нажмите 'Обновить', чтобы увидеть изменения в таблице.",
-                parse_mode="HTML",
-                reply_markup=get_main_menu_keyboard()
-            )
-        else:
-            await processing_msg.edit_text(
-                text=f"❌ <b>Не удалось записаться:</b>\n{error_msg}\n\n"
-                     f"Пожалуйста, выберите другое время или попробуйте позже.",
-                parse_mode="HTML",
-                reply_markup=get_main_menu_keyboard()
-            )
-            
-    except Exception as e:
-        await processing_msg.edit_text(
-            text=f"❌ <b>Критическая ошибка:</b>\n{str(e)}\n\n"
-                 f"Пожалуйста, обратитесь к администратору.",
-            parse_mode="HTML",
-            reply_markup=get_main_menu_keyboard()
-        )
-    
-    await state.clear()
-
-
