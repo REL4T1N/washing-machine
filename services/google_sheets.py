@@ -226,6 +226,48 @@ class GoogleSheetsService:
         except HttpError as e:
             raise Exception(f"Ошибка получения информации о листах: {e}")
 
+    async def batch_update_values(self, sheet_name: str, updates: List[Dict[str, Any]]) -> bool:
+        """
+        Массовое обновление значений в РАЗНЫХ ячейках за один запрос.
+        
+        updates: список словарей вида:
+        [
+            {'range': 'B2', 'values': [['Имя 19.01']]},
+            {'range': 'D5', 'values': [['Имя 20.01']]}
+        ]
+        """
+        try:
+            # Преобразуем локальные адреса 'B2' в полные 'Sheet1!B2'
+            data = []
+            for update in updates:
+                cell_range = update['range']
+                # Если sheet_name еще нет в range, добавляем его
+                if '!' not in cell_range:
+                    full_range = f"{sheet_name}!{cell_range}"
+                else:
+                    full_range = cell_range
+                
+                data.append({
+                    'range': full_range,
+                    'values': update['values']
+                })
+
+            body = {
+                'valueInputOption': 'RAW',
+                'data': data
+            }
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self.service.spreadsheets().values().batchUpdate(
+                    spreadsheetId=self.spreadsheet_id,
+                    body=body
+                ).execute()
+            )
+            return True
+        except HttpError as e:
+            raise Exception(f"Ошибка массового обновления: {e}")
 
 # Синглтон экземпляр
 google_sheets_service = GoogleSheetsService()

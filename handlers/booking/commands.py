@@ -6,12 +6,14 @@ from aiogram.types import Message
 from keyboards.inline import get_main_menu_keyboard
 
 from utils.formatters import format_washing_schedule_simple, split_message
+from utils.filters import IsNamedUser
 
 from services.booking_service import get_cached_table
 
+
 router = Router()
 
-@router.message(Command("table"))
+@router.message(Command("table"), IsNamedUser())
 async def get_table(message: Message, state: FSMContext):
     """Обработчик команды /table - отображение таблицы"""
     await show_table(message, state)
