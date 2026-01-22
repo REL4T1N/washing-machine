@@ -3,20 +3,21 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 
 # Импортируем наше хранилище и валидатор
-from services.storage import user_storage
-from utils.filters import IsNamedUser
+from services.storage import UserStorage
+
+# from utils.filters import IsNamedUser
 
 router = Router()
 
 # --- Хендлер команды /start ---
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, storage: UserStorage):
     user_id = message.from_user.id
-    user = user_storage.get_user(user_id)
+    user = storage.get_user(user_id)
 
     # 1. Если пользователя вообще нет в базе
     if not user:
-        user_storage.add_user(user_id)
+        await storage.add_user(user_id)
         await message.answer(
             "Добро пожаловать. Данный бот предназначен для записи в таблицу[ссылка].\n"
             "Чтобы записаться укажите имя, которое будет использоваться в дальнейшем командой /name. "
@@ -48,7 +49,7 @@ async def cmd_start(message: Message):
 # --- Команда /help ---
 # Мы используем IsNamedUser(). Если у пользователя НЕТ имени, этот хендлер проигнорируется,
 # и бот пойдет искать дальше (и попадет в блокирующий хендлер в errors.py).
-@router.message(Command("help"), IsNamedUser())
+@router.message(Command("help"))#, IsNamedUser())
 async def cmd_help(message: Message):
     text = (
         "Инструкция по использованию:\n\n"

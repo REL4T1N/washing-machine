@@ -3,24 +3,27 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from handlers.booking.commands import show_table
-from states.booking_states import BookingState
-from keyboards.inline import (
-    get_days_keyboard, 
-    get_times_keyboard, 
-    get_main_menu_keyboard
-)
-from utils.date_helpers import get_date_for_day, create_booking_record
-from services.booking_service import write_to_sheet_with_lock, get_free_times_for_day
-from services.storage import user_storage
 
+from states.booking_states import BookingState
+
+from keyboards.inline import get_days_keyboard, get_times_keyboard, get_main_menu_keyboard
+
+from utils.date_helpers import get_date_for_day
+
+from services.booking_service import BookingService
+from services.storage import UserStorage
 
 router = Router()
 
 @router.callback_query(F.data == "update_list")
-async def update_table_handler(callback: CallbackQuery, state: FSMContext):
+async def update_table_handler(
+    callback: CallbackQuery, 
+    state: FSMContext,
+    booking_service: BookingService,
+):
     """Обработчик кнопки обновления"""
     await callback.answer("🔄 Проверяю обновления...", show_alert=False)
-    await show_table(callback.message, state, is_update=True, callback=callback)
+    await show_table(callback.message, state, booking_service, is_update=True, callback=callback)
 
 @router.callback_query(F.data == "write_me")
 async def write_me_handler(callback: CallbackQuery, state: FSMContext):
@@ -36,7 +39,11 @@ async def write_me_handler(callback: CallbackQuery, state: FSMContext):
     )
 
 @router.callback_query(F.data.startswith("day_"))
-async def choose_day_handler(callback: CallbackQuery, state: FSMContext):
+async def choose_day_handler(
+    callback: CallbackQuery, 
+    state: FSMContext,
+    booking_service: BookingService,
+):
     """Обработчик выбора дня"""
     selected_day = callback.data.replace("day_", "")
     
@@ -49,7 +56,7 @@ async def choose_day_handler(callback: CallbackQuery, state: FSMContext):
     await state.update_data(selected_day=selected_day, target_date=target_date)
     await state.set_state(BookingState.choosing_time)
     
-    free_times = await get_free_times_for_day(selected_day, target_date)
+    free_times = await booking_service.get_free_slots_for_day(selected_day, target_date)
     
     await callback.message.edit_text(
         text=f"📅 Выбран день: <b>{selected_day}</b>\n"
@@ -62,7 +69,12 @@ async def choose_day_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 @router.callback_query(F.data.startswith("time_"))
-async def choose_time_handler(callback: CallbackQuery, state: FSMContext):
+async def choose_time_handler(
+    callback: CallbackQuery, 
+    state: FSMContext,
+    booking_service: BookingService,
+    storage: UserStorage,
+):
     """Обработчик выбора времени"""
     try:
         # Формат callback_data: time_8_9_Пн
@@ -83,7 +95,7 @@ async def choose_time_handler(callback: CallbackQuery, state: FSMContext):
         
         # 1. Получаем имя пользователя
         user_id = callback.from_user.id
-        user_data = user_storage.get_user(user_id)
+        user_data = storage.get_user(user_id)
         
         # Теоретически такого быть не должно из-за фильтров, но проверим
         if not user_data or not user_data.get("name"):
@@ -102,16 +114,12 @@ async def choose_time_handler(callback: CallbackQuery, state: FSMContext):
             parse_mode="HTML"
         )
 
-        # 3. Попытка записи
-        booking_record = create_booking_record(name, target_date)
-        
-        success, error_msg = await write_to_sheet_with_lock(
+        # 3. Попытка записи        
+        success, error_msg = await booking_service.book_slot(
+            user_id=user_id,
             day=selected_day,
             time_slot=time_slot,
-            name=name,
             target_date=target_date,
-            booking_record=booking_record,
-            tg_id=user_id  # Передаем ID для сохранения в базу
         )
 
         if success:
@@ -160,7 +168,11 @@ async def cancel_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer("Отменено")
 
 @router.callback_query(F.data == "back_to_main")
-async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
+async def back_to_main_menu(
+    callback: CallbackQuery, 
+    state: FSMContext,
+    booking_service: BookingService,
+):
     """Возвращает пользователя в главное меню с таблицей"""
     # Сбрасываем возможные состояния
     await state.clear()
@@ -169,4 +181,4 @@ async def back_to_main_menu(callback: CallbackQuery, state: FSMContext):
     
     # Используем уже готовую функцию отображения таблицы
     # is_update=True позволяет отредактировать текущее сообщение, а не слать новое
-    await show_table(callback.message, state, is_update=True, callback=callback)
+    await show_table(callback.message, state, booking_service, is_update=True, callback=callback)

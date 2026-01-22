@@ -1,27 +1,36 @@
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
 from keyboards.inline import get_main_menu_keyboard
 
 from utils.formatters import format_washing_schedule_simple, split_message
-from utils.filters import IsNamedUser
+# from utils.filters import IsNamedUser
 
-from services.booking_service import get_cached_table
-
+from services.booking_service import BookingService
 
 router = Router()
 
-@router.message(Command("table"), IsNamedUser())
-async def get_table(message: Message, state: FSMContext):
+@router.message(Command("table"))#, IsNamedUser())
+async def get_table(
+    message: Message, 
+    state: FSMContext,
+    booking_service: BookingService,
+):
     """Обработчик команды /table - отображение таблицы"""
-    await show_table(message, state)
+    await show_table(message, state, booking_service)
 
-async def show_table(message: Message, state: FSMContext, is_update: bool = False, callback=None):
+async def show_table(
+    message: Message, 
+    state: FSMContext, 
+    booking_service: BookingService,
+    is_update: bool = False, 
+    callback: CallbackQuery = None,
+):
     """Показывает таблицу (используется и для команды, и для обновления)"""
     try:
-        result = await get_cached_table(force_refresh=is_update)
+        result = await booking_service.get_table_data(force_refresh=is_update)
         
         if not result or not result[0]:
             text = "📭 Таблица пуста"
