@@ -1,5 +1,6 @@
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties 
-from config.config import BOT_TOKEN
+from config.settings import bot_settings
 
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+def create_bot() -> Bot:
+    return Bot(token=bot_settings.bot_token, default=DefaultBotProperties(parse_mode="HTML"))

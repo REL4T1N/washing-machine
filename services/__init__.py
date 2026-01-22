@@ -1,4 +1,7 @@
-from .google_sheets import google_sheets_service
-from .lock_service import LockService
+from .booking_service import BookingService
+from .google_sheets import GoogleSheetsService
+from .storage import UserStorage
 
-__all__ = ['google_sheets_service', 'LockService']
+# Это позволит другим модулям делать так:
+# from services import BookingService, UserStorage
+# что довольно удобно.

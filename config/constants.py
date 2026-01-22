@@ -1,3 +1,7 @@
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+GS_DATA_RANGE = "A1:N9"
+
 # Маппинг дня на колонку
 DAY_TO_COLUMN = {
     "Пн": "B", "Вт": "D", "Ср": "F", "Чт": "H",
