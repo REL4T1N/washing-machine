@@ -1,7 +1,6 @@
 from typing import List
-from datetime import datetime
 from config.constants import DAYS_OF_WEEK
-from utils.date_helpers import is_cell_available_for_date, parse_cell_content  # ДОБАВИМ
+from utils.date_helpers import parse_cell_content
 
 def split_message(text: str, max_length: int = 4000) -> List[str]:
     """Разбивает длинное сообщение на части"""
