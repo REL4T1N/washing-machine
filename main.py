@@ -70,6 +70,7 @@ async def main():
     dp["bot"] = bot
     dp["storage"] = storage
     dp["booking_service"] = booking_service
+    dp["google_settings"] = google_settings
     dp["gs_service"] = gs_service  # Для команды /name
 
     # 5. Настройка и регистрация роутеров

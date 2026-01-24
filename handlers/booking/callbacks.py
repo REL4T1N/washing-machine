@@ -13,6 +13,8 @@ from utils.date_helpers import get_date_for_day
 from services.booking_service import BookingService
 from services.storage import UserStorage
 
+from config.settings import GoogleSettings
+
 router = Router()
 
 @router.callback_query(F.data == "update_list")
@@ -20,10 +22,11 @@ async def update_table_handler(
     callback: CallbackQuery, 
     state: FSMContext,
     booking_service: BookingService,
+    google_settings: GoogleSettings,
 ):
     """Обработчик кнопки обновления"""
     await callback.answer("🔄 Проверяю обновления...", show_alert=False)
-    await show_table(callback.message, state, booking_service, is_update=True, callback=callback)
+    await show_table(callback.message, state, booking_service, google_settings, is_update=True, callback=callback)
 
 @router.callback_query(F.data == "write_me")
 async def write_me_handler(callback: CallbackQuery, state: FSMContext):
@@ -99,7 +102,10 @@ async def choose_time_handler(
         
         # Теоретически такого быть не должно из-за фильтров, но проверим
         if not user_data or not user_data.get("name"):
-            await callback.answer("❌ Ошибка: У вас не установлено имя. Используйте /name", show_alert=True)
+            await callback.answer(
+                "❌ Ошибка: У вас не установлено имя. Используйте /name", 
+                show_alert=True
+            )
             await state.clear()
             return
 
@@ -172,6 +178,7 @@ async def back_to_main_menu(
     callback: CallbackQuery, 
     state: FSMContext,
     booking_service: BookingService,
+    google_settings: GoogleSettings,
 ):
     """Возвращает пользователя в главное меню с таблицей"""
     # Сбрасываем возможные состояния
@@ -181,4 +188,4 @@ async def back_to_main_menu(
     
     # Используем уже готовую функцию отображения таблицы
     # is_update=True позволяет отредактировать текущее сообщение, а не слать новое
-    await show_table(callback.message, state, booking_service, is_update=True, callback=callback)
+    await show_table(callback.message, state, booking_service, google_settings, is_update=True, callback=callback)

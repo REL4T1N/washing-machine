@@ -2,29 +2,33 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
+from aiogram.utils.markdown import hlink
 
 from keyboards.inline import get_main_menu_keyboard
 
 from utils.formatters import format_washing_schedule_simple, split_message
-# from utils.filters import IsNamedUser
 
 from services.booking_service import BookingService
 
+from config.settings import GoogleSettings
+
 router = Router()
 
-@router.message(Command("table"))#, IsNamedUser())
+@router.message(Command("table"))
 async def get_table(
     message: Message, 
     state: FSMContext,
     booking_service: BookingService,
+    google_settings: GoogleSettings,
 ):
     """Обработчик команды /table - отображение таблицы"""
-    await show_table(message, state, booking_service)
+    await show_table(message, state, booking_service, google_settings)
 
 async def show_table(
     message: Message, 
     state: FSMContext, 
     booking_service: BookingService,
+    google_settings: GoogleSettings,
     is_update: bool = False, 
     callback: CallbackQuery = None,
 ):
@@ -35,7 +39,8 @@ async def show_table(
         if not result or not result[0]:
             text = "📭 Таблица пуста"
         else:
-            text = format_washing_schedule_simple(result)
+            table_link = hlink("таблице", google_settings.full_url)
+            text = format_washing_schedule_simple(result, table_link)
         
         markup = get_main_menu_keyboard()
 

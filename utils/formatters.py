@@ -18,12 +18,12 @@ def split_message(text: str, max_length: int = 4000) -> List[str]:
     
     return messages
 
-def format_washing_schedule_simple(data: List[List[str]]) -> str:
+def format_washing_schedule_simple(data: List[List[str]], table_link: str) -> str:
     """Упрощенное форматирование расписания с учетом дат"""
     if len(data) < 2:
         return "📭 Таблица пуста"
     
-    lines = ["📅 <b>РАСПИСАНИЕ СТИРАЛЬНЫХ МАШИН</b>\n"]
+    lines = [f"📅 <b>Расписание использования стиральной машины согласно {table_link}</b>\n"]
     
     # Получаем даты для текущей недели
     current_week_dates = {}

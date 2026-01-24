@@ -8,11 +8,10 @@ from services.booking_service import BookingService
 from keyboards.inline import get_user_bookings_keyboard, get_delete_confirm_keyboard, get_main_menu_keyboard
 
 from utils.helpers import get_human_readable_slot
-# from utils.filters import IsNamedUser
 
 router = Router()
 
-@router.message(Command("bookings"))#, IsNamedUser())
+@router.message(Command("bookings"))
 async def cmd_bookings(
     message: Message, 
     storage: UserStorage,

@@ -1,5 +1,7 @@
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
+GOOGLE_SHEETS_BASE_URL = "https://docs.google.com/spreadsheets/d/"
+
 GS_DATA_RANGE = "A1:N9"
 
 # Маппинг дня на колонку
