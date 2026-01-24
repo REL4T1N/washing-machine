@@ -27,7 +27,9 @@ async def cmd_name(
 
     args = command.args
     if not args:
-        await message.answer("Пожалуйста, укажите имя после команды. Например: /name Иван")
+        await message.answer(
+            "Пожалуйста, укажите имя после команды. Например: /name Иван"
+        )
         return
 
     raw_name = args.strip()

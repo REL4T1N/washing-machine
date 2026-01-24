@@ -3,8 +3,6 @@ from aiogram import Router
 from aiogram.types import Message, ErrorEvent
 from aiogram import F
 
-# from utils.filters import IsNamedUser
-
 logger = logging.getLogger(__name__)
 
 router = Router()
@@ -14,7 +12,7 @@ router = Router()
 # 2. Это не /name (обработано в user_commands)
 # 3. Это не разрешенный /help (обработано в common)
 # 4. У пользователя НЕТ имени (~IsNamedUser)
-@router.message()#~IsNamedUser())
+@router.message()
 async def block_unnamed_actions(message: Message):
     await message.answer(
         "Извините, но мы не можем продолжить, пока вы не укажите имя.\n"
