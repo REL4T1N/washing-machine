@@ -103,7 +103,7 @@ class UserStorage:
         str_id = str(user_id)
         if str_id in self._data["users"]:
             self._data["users"][str_id]["name"] = name
-            self._save()
+            await self._save()
 
     # --- Методы работы с записями (Bookings) (только читающие) ---
 
