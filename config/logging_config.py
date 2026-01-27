@@ -1,38 +1,44 @@
+import os
+import sys
 import logging
 from logging.handlers import RotatingFileHandler
-import sys
 
 def setup_logging():
-    """Настраивает логирование в консоль и в файл."""
+    """
+    Настраивает глобальную систему логирования.
     
-    # Создаем директорию для логов, если ее нет
-    import os
-    if not os.path.exists('data'):
-        os.makedirs('data')
+    - DEBUG и выше: записывается в файл 'data/bot.log' (с ротацией).
+    - INFO и выше: выводится в консоль (stdout).
+    """
+    
+    # Создание директории для логов, если ее нет
+    log_dir = 'data'
+    log_file = os.path.join(log_dir, 'bot.log')
+
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    # Получаем корневой логгер
+    # 1. Корневой логгер
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG) # Устанавливаем самый низкий уровень
+    root_logger.setLevel(logging.DEBUG)
 
-    # 1. Обработчик для вывода в консоль (stdout)
+    # 2. Консольный обработчик (stdout)
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO) # Выводим в консоль только INFO и выше
+    console_handler.setLevel(logging.INFO) 
     console_handler.setFormatter(logging.Formatter(log_format))
     
-    # 2. Обработчик для записи в файл
-    # RotatingFileHandler автоматически будет создавать новые файлы логов, когда старый достигнет 5MB
+    # 3. Файловый обработчик с ротацией (5MB, 2 старых лога)
     file_handler = RotatingFileHandler(
-        'data/bot.log', 
-        maxBytes=5*1024*1024, # 5 MB
+        log_file, 
+        maxBytes=5*1024*1024,
         backupCount=2, 
         encoding='utf-8'
     )
-    file_handler.setLevel(logging.DEBUG) # В файл пишем всё, начиная с DEBUG
+    file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter(log_format))
 
-    # Добавляем обработчики к корневому логгеру
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
 

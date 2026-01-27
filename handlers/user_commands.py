@@ -2,13 +2,13 @@ from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
+from config.settings import google_settings
+
 from services.storage import UserStorage
 from services.google_sheets import GoogleSheetsService
 from services.booking_service import BookingService
 
 from utils.validators import validate_name_only
-
-from config.settings import google_settings
 
 router = Router()
 
@@ -20,6 +20,7 @@ async def cmd_name(
     booking_service: BookingService,
     gs_service: GoogleSheetsService,
 ):
+    """Установка или смена имени. Обновляет все записи в таблице при смене."""
     user_id = message.from_user.id
     
     if not storage.user_exists(user_id):
@@ -94,7 +95,7 @@ async def cmd_name(
                     )
 
             else:
-                await wait_msg.delete()
+                await wait_msg.edit_text(f"✅ Имя изменено на <b>{cleaned_name}</b>.")
 
         except Exception as e:
             await wait_msg.edit_text(

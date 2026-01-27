@@ -10,15 +10,25 @@ from utils.helpers import cell_to_indices
 logger = logging.getLogger(__name__)
 
 class UserStorage:
+    """
+    Асинхронное файловое хранилище для данных пользователей и бронирований.
+    
+    Использует JSON для персистентности и asyncio.Lock для потокобезопасности.
+    """
+
     def __init__(self, filename: str = "users_data.json"):
+        """
+        Args:
+            filename: Путь к JSON-файлу хранилища.
+        """
         self.filename = filename
         self._lock = asyncio.Lock()
         self._data = {
-            "users": {},      # { "user_id": { "name": "...", "points": {"B2": "19.01"} } }
-            "global_map": {}  # { "B2": { "user_id": "...", "date": "19.01" } }
+            "users": {},      # { "user_id": { "name": str, "points": { "cell": "date" } } }
+            "global_map": {}  # { "cell_address": { "user_id": str, "date": str } }
         }
 
-    async def load(self):
+    async def load(self) -> None:
         """
         Асинхронно загружает данные из файла.
         Должна вызываться один раз при старте приложения.
@@ -35,7 +45,7 @@ class UserStorage:
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"❌ Ошибка загрузки данных из {self.filename}: {e}")
 
-    def _load_sync(self):
+    def _load_sync(self) -> None:
         """Синхронная часть загрузки данных."""
         with open(self.filename, 'r', encoding='utf-8') as f:
             raw_data = json.load(f)
@@ -50,13 +60,13 @@ class UserStorage:
                     if "points" not in self._data["users"][u_id]:
                         self._data["users"][u_id]["points"] = {}
 
-    async def _save(self):
+    async def _save(self) -> None:
         """Асинхронно и безопасно сохраняет данные в файл."""
         async with self._lock:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._save_sync)
 
-    def _save_sync(self):
+    def _save_sync(self) -> None:
         """Синхронная часть сохранения данных."""
         try:
             with open(self.filename, 'w', encoding='utf-8') as f:
@@ -66,6 +76,7 @@ class UserStorage:
 
 
     # --- Методы работы с пользователями (только читающие) ---
+
     def user_exists(self, user_id: int) -> bool:
         """Проверяет наличие пользователя в базе."""
         return str(user_id) in self._data["users"]
@@ -89,7 +100,7 @@ class UserStorage:
 
     # --- Методы работы с пользователями (читающие и пишущие) ---
 
-    async def add_user(self, user_id: int):
+    async def add_user(self, user_id: int) -> None:
         str_id = str(user_id)
         if str_id not in self._data["users"]:
             self._data["users"][str_id] = {
@@ -98,7 +109,7 @@ class UserStorage:
             }
             await self._save()
 
-    async def set_user_name(self, user_id: int, name: str):
+    async def set_user_name(self, user_id: int, name: str) -> None:
         """Устанавливает имя пользователю."""
         str_id = str(user_id)
         if str_id in self._data["users"]:
@@ -123,7 +134,7 @@ class UserStorage:
 
     # --- Методы работы с записями (Bookings) (читающие и пишущие) ---
 
-    async def add_booking(self, user_id: int, cell_address: str, date: str):
+    async def add_booking(self, user_id: int, cell_address: str, date: str) -> None:
         """
         Добавляет запись:
         1. В global_map (чтобы знать, чья ячейка)
@@ -145,7 +156,7 @@ class UserStorage:
         await self._save()
         logger.info(f"Запись добавлена: User {user_id}, Cell {cell_address}, Date {date}")
 
-    async def remove_booking(self, cell_address: str):
+    async def remove_booking(self, cell_address: str) -> None:
         """Удаляет запись по адресу ячейки у владельца и из карты."""
         if cell_address not in self._data["global_map"]:
             return
@@ -166,9 +177,8 @@ class UserStorage:
 
     async def sync_user_bookings(self, user_id: int, table_data: List[List[str]]) -> Dict[str, str]:
         """
-        Проверяет записи пользователя на актуальность.
-        Удаляет просроченные и 'призрачные' записи.
-        Возвращает актуальный словарь {ячейка: дата}.
+        Синхронизирует локальные данные пользователя с состоянием Google Таблицы.
+        Удаляет просроченные записи или те, что были изменены в таблице вручную.
         """
         str_id = str(user_id)
         if str_id not in self._data["users"]:
@@ -186,16 +196,11 @@ class UserStorage:
                 continue
 
             # 2. Проверка соответствия таблице (Ghost Booking)
-            if not table_data:
-                # Если таблица почему-то пуста, лучше ничего не удалять, чтобы не поломать данные при сбое API
-                continue
-                
             try:
                 row_idx, col_idx = cell_to_indices(cell_address)
                 
                 # Проверка выхода за границы
                 if row_idx >= len(table_data) or col_idx >= len(table_data[row_idx]):
-                    # Ячейка за пределами таблицы? Считаем, что её очистили.
                     cells_to_remove.append(cell_address)
                     continue
 
@@ -209,26 +214,22 @@ class UserStorage:
                 # Если в ячейке другое имя -> Ghost
                 parsed = parse_cell_content(cell_value)
                 if parsed and parsed.get("name"):
-                    # Сравниваем имена (без учета регистра)
                     if user_name and parsed["name"].lower() != user_name.lower():
                         cells_to_remove.append(cell_address)
                         continue
                 else:
-                    # Если там мусор, который нельзя распарсить -> удаляем из брони пользователя
+                    # Если мусор, который нельзя распарсить -> удаляем из брони пользователя
                     cells_to_remove.append(cell_address)
 
             except Exception as e:
                 logger.warning(f"Ошибка при синхронизации ячейки {cell_address}: {e}")
                 continue
 
-        # Удаляем накопленное
+        # Удаление накопленного
         if cells_to_remove:
             logger.info(f"Для пользователя {user_id} будут удалены призрачные записи: {cells_to_remove}")
             for cell in cells_to_remove:
                 await self.remove_booking(cell)
             
-        # Возвращаем актуальное состояние
+        # Актуальное состояние
         return self._data["users"][str_id].get("points", {})
-
-# Глобальный экземпляр
-# user_storage = UserStorage()

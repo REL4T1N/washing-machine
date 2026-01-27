@@ -27,7 +27,7 @@ class GoogleSheetsService:
             logger.critical(f"❌ Критическая ошибка инициализации Google Sheets: {e}")
             raise
 
-    async def _execute_request(self, func):
+    async def _execute_request(self, func) -> Any:
         """Выполняет блокирующий запрос API в отдельном потоке."""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, func)
@@ -73,8 +73,7 @@ class GoogleSheetsService:
     async def batch_update_values(self, sheet_name: str, updates: List[Dict[str, Any]]) -> bool:
         """
         Массовое обновление значений в РАЗНЫХ ячейках за один запрос.
-        
-        updates: список словарей вида:
+        Args: updates - список словарей вида:
         [
             {'range': 'B2', 'values': [['Имя 19.01']]},
             {'range': 'D5', 'values': [['Имя 20.01']]}
@@ -99,6 +98,3 @@ class GoogleSheetsService:
         except HttpError as e:
             logger.error(f"Ошибка массового обновления в '{sheet_name}': {e}")
             return False
-
-# Синглтон экземпляр
-# google_sheets_service = GoogleSheetsService()

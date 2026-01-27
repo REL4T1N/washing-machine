@@ -21,15 +21,16 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📋 Мои записи", callback_data="my_bookings")
     ) 
 
-
     return builder.as_markup()
 
 def get_cancel_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для отмены"""
     builder = InlineKeyboardBuilder()
+
     builder.row(
         InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")
     )
+
     return builder.as_markup()
 
 def get_days_keyboard() -> InlineKeyboardMarkup:
@@ -46,20 +47,10 @@ def get_days_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 def get_times_keyboard(day: str, target_date: str, free_times: list[str]) -> InlineKeyboardMarkup:
-    """
-    Клавиатура для выбора времени
-    Показываем ТОЛЬКО свободные слоты на указанную дату
-    
-    Аргументы:
-    - day: день недели ('Пн', 'Вт'...)
-    - target_date: дата в формате 'дд.мм'
-    - free_times: список времен, которые СВОБОДНЫ на эту дату
-    """
-
+    """Клавиатура выбора времени, фильтрующая только доступные слоты."""
     builder = InlineKeyboardBuilder()
     
     if not free_times:
-        # Если нет свободных слотов
         builder.row(InlineKeyboardButton(
             text="❌ Нет свободных слотов", 
             callback_data="no_slots"
@@ -67,7 +58,6 @@ def get_times_keyboard(day: str, target_date: str, free_times: list[str]) -> Inl
     else:
         for time_text, time_code in TIME_SLOTS:
             if time_text in free_times:
-                # Только свободные слоты
                 builder.row(InlineKeyboardButton(
                     text=f"✅ {time_text}", 
                     callback_data=f"time_{time_code}_{day}"
@@ -79,11 +69,7 @@ def get_times_keyboard(day: str, target_date: str, free_times: list[str]) -> Inl
     return builder.as_markup()
 
 def get_user_bookings_keyboard(bookings_list: list, page: int = 0) -> InlineKeyboardMarkup:
-    """
-    Клавиатура со списком записей пользователя.
-    bookings_list: список кортежей [('B2', '19.01'), ...]
-    page: текущая страница (с 0)
-    """
+    """Клавиатура списка записей пользователя с пагинацией."""
     builder = InlineKeyboardBuilder()
     
     ITEMS_PER_PAGE = 6
@@ -92,17 +78,13 @@ def get_user_bookings_keyboard(bookings_list: list, page: int = 0) -> InlineKeyb
     
     current_page_items = bookings_list[start_idx:end_idx]
     
-    # Кнопки записей
     for cell_addr, date_str in current_page_items:
-        # Превращаем B2 в "Пн 8-9"
         slot_text = get_human_readable_slot(cell_addr)
-        # Текст кнопки: 📅 19.01 Пн 8:00-9:00
         btn_text = f"📅 {date_str} {slot_text}"
         
-        # callback: manage_booking_B2
         builder.row(InlineKeyboardButton(text=btn_text, callback_data=f"manage_booking_{cell_addr}"))
     
-    # Кнопки пагинации
+    # Пагинация
     pagination_buttons = []
     if page > 0:
         pagination_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"bookings_page_{page-1}"))
@@ -118,7 +100,10 @@ def get_user_bookings_keyboard(bookings_list: list, page: int = 0) -> InlineKeyb
     return builder.as_markup()
 
 def get_delete_confirm_keyboard(cell_address: str) -> InlineKeyboardMarkup:
+    """Подтверждение удаления конкретной записи."""
     builder = InlineKeyboardBuilder()
+
     builder.row(InlineKeyboardButton(text="🗑️ Да, удалить", callback_data=f"confirm_delete_{cell_address}"))
     builder.row(InlineKeyboardButton(text="🔙 Не удалять", callback_data="back_to_bookings"))
+    
     return builder.as_markup()

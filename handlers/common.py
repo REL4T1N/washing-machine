@@ -3,8 +3,9 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from aiogram.utils.markdown import hlink
 
-from services.storage import UserStorage
 from config.settings import GoogleSettings
+
+from services.storage import UserStorage
 
 router = Router()
 

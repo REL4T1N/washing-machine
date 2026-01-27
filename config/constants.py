@@ -1,7 +1,11 @@
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+"""
+Константы проекта: настройки Google Sheets, временные слоты и маппинги.
+"""
 
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 GOOGLE_SHEETS_BASE_URL = "https://docs.google.com/spreadsheets/d/"
 
+# Диапазон данных в таблице (захватываем сетку бронирования)
 GS_DATA_RANGE = "A1:N9"
 
 # Маппинг дня на колонку

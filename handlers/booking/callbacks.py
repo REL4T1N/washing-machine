@@ -2,18 +2,18 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from handlers.booking.commands import show_table
+from config.settings import GoogleSettings
 
-from states.booking_states import BookingState
+from handlers.booking.commands import show_table
 
 from keyboards.inline import get_days_keyboard, get_times_keyboard, get_main_menu_keyboard
 
-from utils.date_helpers import get_date_for_day
+from states.booking_states import BookingState
 
 from services.booking_service import BookingService
 from services.storage import UserStorage
 
-from config.settings import GoogleSettings
+from utils.date_helpers import get_date_for_day
 
 router = Router()
 

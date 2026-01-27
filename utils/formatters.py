@@ -1,6 +1,7 @@
 from typing import List
 from config.constants import DAYS_OF_WEEK
-from utils.date_helpers import parse_cell_content
+from utils.date_helpers import parse_cell_content, get_date_for_day
+
 
 def split_message(text: str, max_length: int = 4000) -> List[str]:
     """Разбивает длинное сообщение на части"""
@@ -19,22 +20,17 @@ def split_message(text: str, max_length: int = 4000) -> List[str]:
     return messages
 
 def format_washing_schedule_simple(data: List[List[str]], table_link: str) -> str:
-    """Упрощенное форматирование расписания с учетом дат"""
+    """
+    Преобразует данные из Google Sheets в красивое текстовое расписание.
+    Сравнивает даты в ячейках с текущей неделей, чтобы скрыть записи за другие недели.
+    """
     if len(data) < 2:
         return "📭 Таблица пуста"
     
     lines = [f"📅 <b>Расписание использования стиральной машины согласно {table_link}</b>\n"]
     
-    # Получаем даты для текущей недели
-    current_week_dates = {}
-    for day_idx, day_name in enumerate(DAYS_OF_WEEK):
-        try:
-            # Используем нашу функцию из date_helpers
-            from utils.date_helpers import get_date_for_day
-            date_str = get_date_for_day(day_name)
-            current_week_dates[day_name] = date_str
-        except:
-            current_week_dates[day_name] = None
+    # Даты для текущей недели
+    current_week_dates = {day: get_date_for_day(day) for day in DAYS_OF_WEEK}
     
     for day_idx, day_name in enumerate(DAYS_OF_WEEK):
         name_col_idx = day_idx * 2 + 1
@@ -57,11 +53,11 @@ def format_washing_schedule_simple(data: List[List[str]], table_link: str) -> st
                 
                 cell_value = data[time_row_idx][name_col_idx].strip()
                 
-                # Парсим запись
+                # Парсинг записи
                 parsed = parse_cell_content(cell_value)
                 
                 if parsed and parsed.get('date'):
-                    # Проверяем, актуальна ли запись для этой недели
+                    # Актуальна ли запись для этой недели
                     if current_date and parsed['date'] == current_date:
                         # Запись на эту неделю - показываем
                         booking = cell_value
@@ -80,7 +76,6 @@ def format_washing_schedule_simple(data: List[List[str]], table_link: str) -> st
         
         lines.extend(day_lines)
     
-    # Добавляем информацию о неделе
     lines.append("\n📆 <i>Актуально на текущую неделю</i>")
     
     return "\n".join(lines)

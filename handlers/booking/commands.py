@@ -4,13 +4,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.markdown import hlink
 
-from keyboards.inline import get_main_menu_keyboard
+from config.settings import GoogleSettings
 
-from utils.formatters import format_washing_schedule_simple, split_message
+from keyboards.inline import get_main_menu_keyboard
 
 from services.booking_service import BookingService
 
-from config.settings import GoogleSettings
+from utils.formatters import format_washing_schedule_simple, split_message
 
 router = Router()
 

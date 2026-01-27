@@ -5,38 +5,36 @@ import sys
 from bot.bot import create_bot
 from bot.dispatcher import create_dispatcher
 
-# Хэндлеры
+from config.settings import google_settings, settings
+from config.logging_config import setup_logging
+
 from handlers import setup_routers
 
 from services.google_sheets import GoogleSheetsService
 from services.storage import UserStorage
 from services.booking_service import BookingService
 
-from config.settings import google_settings, settings
-from config.logging_config import setup_logging
 
-# Настройка логирования
 logger = logging.getLogger(__name__)
 
-def signal_handler(signum, frame, loop):
-    """Обработчик сигналов для корректного завершения"""
-    logger.info(f"Получен сигнал {signum}, завершаем работу...")
-    loop.stop()
-
 async def on_shutdown(storage: UserStorage):
-    """Функция, выполняемая при завершении работы бота"""
+    """
+    Действия при завершении работы бота.
+    
+    Args:
+        dispatcher: Экземпляр диспетчера.
+        storage: Хранилище пользователей для вывода финальной статистики.
+    """
     logger.info("Завершение работы бота...")
     
-    # Выводим статистику перед завершением
+    # Вывод статистики перед завершением
     count = storage.get_users_count()
     logger.info(f"Сохранено {count} пользователей в хранилище")
         
     logger.info("Бот успешно остановлен")
 
 async def main():
-    """Основная функция запуска бота"""
-    
-    """Основная функция запуска бота."""
+    """Основная функция инициализации и запуска polling."""
     
     # 1. Настройка логирования
     setup_logging()
@@ -66,12 +64,12 @@ async def main():
         lock_timeout=settings.lock_timeout
     )
 
-    # 4. "Прокидываем" наши сервисы в middleware (workflow_data)
+    # 4. Прокидываем сервисы в middleware (workflow_data)
     dp["bot"] = bot
     dp["storage"] = storage
     dp["booking_service"] = booking_service
     dp["google_settings"] = google_settings
-    dp["gs_service"] = gs_service  # Для команды /name
+    dp["gs_service"] = gs_service 
 
     # 5. Настройка и регистрация роутеров
     setup_routers(dp, storage)
@@ -87,10 +85,8 @@ async def main():
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
-        # 3. Гарантированно закрываем сессию бота здесь
+        # Гарантированное закрытие сессии бота
         await bot.session.close()
-
-
 
 if __name__ == "__main__":
     try:
