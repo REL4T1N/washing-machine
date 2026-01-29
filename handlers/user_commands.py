@@ -55,7 +55,6 @@ async def cmd_name(
         )
         return
     
-    await storage.set_user_name(user_id, cleaned_name)
 
     # 3. Логика обновления записей
     # Если у пользователя уже есть имя, значит, у него могут быть записи со старым именем
@@ -67,7 +66,8 @@ async def cmd_name(
         try:
             table_data = await booking_service.get_table_data(force_refresh=True)
             user_bookings = await storage.sync_user_bookings(user_id, table_data)
-            
+
+
             if user_bookings:
                 # Формируем пакет обновлений для Google Sheets
                 updates = []
@@ -82,6 +82,7 @@ async def cmd_name(
                 # Отправляем одним запросом (batchUpdate)
                 success = await gs_service.batch_update_values(google_settings.sheet_name, updates)
                 if success:
+                    await storage.set_user_name(user_id, cleaned_name)
                     await booking_service.invalidate_cache()
                     await wait_msg.edit_text(
                         f"✅ Имя обновлено на '{cleaned_name}'. "
@@ -90,19 +91,19 @@ async def cmd_name(
 
                 else:
                     await wait_msg.edit_text(
-                        "⚠️ Имя обновлено, но не удалось изменить записи в таблице. "
-                        "Пожалуйста, проверьте их вручную."
+                        "⚠️ Ошибка связи с Google Sheets. Имя НЕ изменено. "
+                        "Попробуйте еще раз через минуту."
                     )
 
             else:
+                await storage.set_user_name(user_id, cleaned_name)
                 await wait_msg.edit_text(f"✅ Имя изменено на <b>{cleaned_name}</b>.")
 
         except Exception as e:
-            await wait_msg.edit_text(
-                f"⚠️ Имя обновлено, но произошла ошибка при изменении записей в таблице: {e}"
-            )
+            await wait_msg.edit_text(f"⚠️ Произошла ошибка: {e}. Имя не изменено.")
     
     else:
+        await storage.set_user_name(user_id, cleaned_name)
         await message.answer(
             f"Приятно познакомиться, {cleaned_name}.\n\n"
             "Теперь вы можете пользоваться ботом. Начните с команды /table."
