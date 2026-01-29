@@ -1,4 +1,3 @@
-# .dockerignore
 # Игнорируем виртуальное окружение
 .venv/
 venv/
@@ -10,6 +9,7 @@ __pycache__/
 *$py.class
 
 # Игнорируем логи и временные файлы
+.git/
 *.log
 *.tmp
 *.temp
@@ -25,7 +25,8 @@ __pycache__/
 Thumbs.db
 
 # Игнорируем тестовые данные и бэкапы
-test_data/
+tests/
+pytest.ini
 backup/
 *.bak
 
