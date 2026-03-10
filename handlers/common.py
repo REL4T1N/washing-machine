@@ -24,8 +24,9 @@ async def cmd_start(
         await storage.add_user(user_id)
         table_link = hlink("таблице", google_settings.full_url)
         text = (
-            "Добро пожаловать, новый пользователь! "
-            f"Данный бот предназначен для учёта в записи {table_link}"
+            "Добро пожаловать, новый пользователь!\n"
+            f"Данный бот предназначен для учёта в записи {table_link}\n"
+            "Для продолжения установите имя командой /name. Например: /name Иван"
         )
         await message.answer(text, parse_mode="HTML")
         return
